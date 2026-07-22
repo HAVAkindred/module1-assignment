@@ -1,0 +1,196 @@
+name: VERITAS Phase 1 Corpus Retrieval
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-corpus:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Retrieve official public doctrine PDFs
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          ROOT="VERITAS_Phase_1_Foundational_Doctrine"
+          mkdir -p "$ROOT/01_Policy_Governance" "$ROOT/02_Command_Targeting" "$ROOT/03_Intelligence_Assurance" "$ROOT/metadata"
+          : > "$ROOT/metadata/download_log.tsv"
+          printf 'id\ttitle\tpublication_number\tissuer\tpublication_date\tpriority\tcategory\tfilename\tofficial_url\tstatus\tnotes\n' > "$ROOT/metadata/source_manifest.tsv"
+
+          download_pdf() {
+            local id="$1" title="$2" pub="$3" issuer="$4" date="$5" priority="$6" category="$7" filename="$8" url="$9" notes="${10}"
+            local dest="$ROOT/$category/$filename"
+            local status="download_failed"
+
+            echo "Downloading $pub - $title"
+            if curl --fail --location --silent --show-error \
+              --retry 5 --retry-delay 3 --retry-all-errors \
+              --connect-timeout 30 --max-time 900 \
+              --user-agent 'Mozilla/5.0 (compatible; VERITAS-corpus-retrieval/1.0)' \
+              --output "$dest" "$url"; then
+              if [ "$(head -c 5 "$dest" 2>/dev/null || true)" = "%PDF-" ]; then
+                status="downloaded"
+              else
+                status="invalid_pdf_response"
+                rm -f "$dest"
+              fi
+            fi
+
+            printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+              "$id" "$title" "$pub" "$issuer" "$date" "$priority" "$category" "$filename" "$url" "$status" "$notes" \
+              >> "$ROOT/metadata/source_manifest.tsv"
+            printf '%s\t%s\t%s\n' "$pub" "$status" "$url" >> "$ROOT/metadata/download_log.tsv"
+          }
+
+          download_pdf 'P1-001' 'Autonomy in Weapon Systems' 'DoDD 3000.09' 'Department of Defense' '2023-01-25' 'P1' '01_Policy_Governance' \
+            'DoDD_3000.09_Autonomy_in_Weapon_Systems_2023.pdf' \
+            'https://www.esd.whs.mil/Portals/54/Documents/DD/issuances/dodd/300009p.pdf' \
+            'Authoritative DoD autonomy policy baseline.'
+
+          download_pdf 'P1-002' 'Department of Defense Law of War Manual' 'DoD Law of War Manual' 'Department of Defense Office of General Counsel' '2023-07' 'P1' '01_Policy_Governance' \
+            'DoD_Law_of_War_Manual_Updated_July_2023.pdf' \
+            'https://media.defense.gov/2023/Jul/31/2003271432/-1/-1/0/DOD-LAW-OF-WAR-MANUAL-JUNE-2015-UPDATED-JULY%202023.PDF' \
+            'Controlling legal framework; updated July 2023.'
+
+          download_pdf 'P1-003' 'Responsible Artificial Intelligence Strategy and Implementation Pathway' 'DoD RAI Strategy and Implementation Pathway' 'Department of Defense' '2022-06' 'P1' '01_Policy_Governance' \
+            'DoD_Responsible_AI_Strategy_and_Implementation_Pathway_2022.pdf' \
+            'https://media.defense.gov/2022/Jun/22/2003022604/-1/-1/0/Department-of-Defense-Responsible-Artificial-Intelligence-Strategy-and-Implementation-Pathway.PDF' \
+            'Responsible AI governance and lifecycle implementation.'
+
+          download_pdf 'P1-004' 'Data, Analytics, and Artificial Intelligence Adoption Strategy' 'DoD Data Analytics and AI Adoption Strategy' 'Department of Defense' '2023-11-02' 'P1' '01_Policy_Governance' \
+            'DoD_Data_Analytics_and_AI_Adoption_Strategy_2023.pdf' \
+            'https://media.defense.gov/2023/Nov/02/2003333300/-1/-1/1/DOD_DATA_ANALYTICS_AI_ADOPTION_STRATEGY.PDF' \
+            'Enterprise data and AI adoption model.'
+
+          download_pdf 'P1-005' 'Artificial Intelligence' 'AFDN 25-1' 'Department of the Air Force' '2025-04-08' 'P1' '01_Policy_Governance' \
+            'AFDN_25-1_Artificial_Intelligence_2025.pdf' \
+            'https://www.doctrine.af.mil/Portals/61/documents/AFDN_25-1/AFDN%2025-1%20Artificial%20Intelligence.pdf' \
+            'Current Air Force doctrine note on operational AI.'
+
+          download_pdf 'P1-006' 'Artificial Intelligence Risk Management Framework 1.0' 'NIST AI 100-1' 'National Institute of Standards and Technology' '2023-01-26' 'P1' '03_Intelligence_Assurance' \
+            'NIST_AI_RMF_1.0_NIST_AI_100-1_2023.pdf' \
+            'https://tsapps.nist.gov/publication/get_pdf.cfm?pub_id=936225' \
+            'Technology-neutral AI risk-management and assurance framework.'
+
+          download_pdf 'P1-007' 'Mission Command' 'AFDP 1-1' 'Department of the Air Force' '2023-08-14' 'P1' '02_Command_Targeting' \
+            'AFDP_1-1_Mission_Command_2023.pdf' \
+            'https://www.doctrine.af.mil/Portals/61/documents/AFDP_1-1/AFDP%201-1%20Mission%20Command.pdf' \
+            'Commander intent, delegated authority, trust, and distributed operations.'
+
+          download_pdf 'P1-008' 'Command and Control' 'AFDP 3-0.1' 'Department of the Air Force' '2025-01-22' 'P1' '02_Command_Targeting' \
+            'AFDP_3-0.1_Command_and_Control_2025.pdf' \
+            'https://www.doctrine.af.mil/Portals/61/documents/AFDP_3-0_1/AFDP3-0.1CommandandControl.pdf' \
+            'Foundational C2 doctrine for distributed control and decentralized execution.'
+
+          download_pdf 'P1-009' 'Targeting' 'AFDP 3-60' 'Department of the Air Force' '2026-05-01' 'P1' '02_Command_Targeting' \
+            'AFDP_3-60_Targeting_2026.pdf' \
+            'https://www.doctrine.af.mil/Portals/61/documents/AFDP_3-60/3-60-AFDP-TARGETING.pdf' \
+            'Current Air Force targeting doctrine.'
+
+          download_pdf 'P1-010' 'Army Targeting' 'FM 3-60' 'Department of the Army' '2023-08-11' 'P1' '02_Command_Targeting' \
+            'FM_3-60_Army_Targeting_2023.pdf' \
+            'https://armypubs.army.mil/epubs/DR_pubs/DR_a/ARN39048-FM_3-60-000-WEB-1.pdf' \
+            'Army D3A and commander-led targeting process.'
+
+          download_pdf 'P1-011' 'Intelligence' 'AFDP 2-0' 'Department of the Air Force' '2026-05-01' 'P1' '03_Intelligence_Assurance' \
+            'AFDP_2-0_Intelligence_2026.pdf' \
+            'https://www.doctrine.af.mil/Portals/61/documents/AFDP_2-0/2-0-AFDP-INTELLIGENCE.pdf' \
+            'Current Air Force intelligence and ISR/PED doctrine.'
+
+          download_pdf 'P1-012' 'Intelligence Support to Army Targeting' 'ATP 2-01.4' 'Department of the Army' '2026-03-04' 'P1' '03_Intelligence_Assurance' \
+            'ATP_2-01.4_Intelligence_Support_to_Army_Targeting_2026.pdf' \
+            'https://armypubs.army.mil/epubs/DR_pubs/DR_a/ARN46059-ATP_2-01.4-000-WEB-1.pdf' \
+            'Target intelligence, collection, indicators, validation, confidence, and assessment.'
+
+          cat > "$ROOT/metadata/CONTROLLED_OR_UNRETRIEVED.csv" <<'CSV'
+publication,title,access,phase_disposition,reason
+JP 3-60,Joint Targeting,JEL+ / CAC,Tracked for authorized ingest,Primary doctrinal anchor but not publicly retrievable
+Dynamic Targeting MTTP,Dynamic Targeting MTTP,Restricted / Intelink,Deferred to authorized enclave,Execution-level targeting procedures
+ISR Optimization MTTP,ISR Optimization MTTP,Restricted / Intelink,Deferred to authorized enclave,Cross-service sensor allocation and PED procedures
+JFIRE MTTP,JFIRE MTTP,Restricted / Intelink,Deferred to authorized enclave,Joint fires execution procedures
+CSV
+
+          cat > "$ROOT/README.md" <<'MD'
+# VERITAS Doctrine Corpus - Phase 1
+
+Phase 1 establishes the public, authoritative baseline for autonomy governance, legal constraints, responsible AI, command and control, targeting, intelligence, and assurance.
+
+## Corpus phasing
+
+1. **Phase 1 - Foundational governance, command, targeting, intelligence, and assurance**
+2. **Phase 2 - Reconnaissance, collection management, JIPOE, assessment, and mission-thread execution**
+3. **Phase 3 - Electromagnetic spectrum, cyber/EW, airspace control, and counter-UAS**
+4. **Phase 4 - UAS employment, fires integration, dynamic targeting, and service-specific execution**
+5. **Phase 5 - Data architecture, interoperability, MOSA, open standards, systems engineering, and technical assurance**
+6. **Phase 6 - Threat/adversary doctrine, operational lessons, force design, research, and controlled-source reconciliation**
+
+## Handling note
+
+This package contains only documents retrieved from public official sources. Controlled/CAC/Intelink publications are recorded in `metadata/CONTROLLED_OR_UNRETRIEVED.csv` and are not reproduced.
+
+## Verification
+
+See `metadata/manifest.csv`, `metadata/manifest.json`, and `metadata/SHA256SUMS.txt`. Every included file was checked for a PDF signature and hashed after retrieval.
+MD
+
+          python3 - <<'PY'
+          import csv, hashlib, json, pathlib
+
+          root = pathlib.Path('VERITAS_Phase_1_Foundational_Doctrine')
+          tsv = root / 'metadata' / 'source_manifest.tsv'
+          rows = []
+          with tsv.open(encoding='utf-8', newline='') as f:
+              for row in csv.DictReader(f, delimiter='\t'):
+                  path = root / row['category'] / row['filename']
+                  if path.exists():
+                      data = path.read_bytes()
+                      row['sha256'] = hashlib.sha256(data).hexdigest()
+                      row['size_bytes'] = str(len(data))
+                  else:
+                      row['sha256'] = ''
+                      row['size_bytes'] = '0'
+                  rows.append(row)
+
+          fields = list(rows[0].keys()) if rows else []
+          with (root / 'metadata' / 'manifest.csv').open('w', encoding='utf-8', newline='') as f:
+              w = csv.DictWriter(f, fieldnames=fields)
+              w.writeheader()
+              w.writerows(rows)
+          (root / 'metadata' / 'manifest.json').write_text(json.dumps(rows, indent=2), encoding='utf-8')
+
+          pdfs = sorted(root.rglob('*.pdf'))
+          with (root / 'metadata' / 'SHA256SUMS.txt').open('w', encoding='utf-8') as f:
+              for p in pdfs:
+                  digest = hashlib.sha256(p.read_bytes()).hexdigest()
+                  f.write(f'{digest}  {p.relative_to(root).as_posix()}\n')
+
+          summary = {
+              'expected_documents': len(rows),
+              'downloaded_documents': sum(r['status'] == 'downloaded' for r in rows),
+              'failed_documents': [r['publication_number'] for r in rows if r['status'] != 'downloaded'],
+              'total_bytes': sum(int(r['size_bytes']) for r in rows),
+          }
+          (root / 'metadata' / 'run_summary.json').write_text(json.dumps(summary, indent=2), encoding='utf-8')
+          print(json.dumps(summary, indent=2))
+          PY
+
+          rm -f "$ROOT/metadata/source_manifest.tsv"
+          find "$ROOT" -type f -maxdepth 3 -print | sort
+          zip -r -9 VERITAS_Phase_1_Foundational_Doctrine.zip "$ROOT"
+
+      - name: Upload corpus ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: VERITAS_Phase_1_Foundational_Doctrine
+          path: VERITAS_Phase_1_Foundational_Doctrine.zip
+          if-no-files-found: error
+          retention-days: 1
