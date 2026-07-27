@@ -61,7 +61,9 @@ jobs:
               assert names
               assert all(n.startswith('PASS_01_Joint_Doctrine/') and n.lower().endswith('.pdf') for n in names)
               assert len(names) == len(set(names))
-              assert all(f.read(n, 5).startswith(b'%PDF-') for n in names)
+              for name in names:
+                  with f.open(name) as member:
+                      assert member.read(5).startswith(b'%PDF-')
           print(f'ZIP validation passed: {len(names)} PDFs')
           PY
 
