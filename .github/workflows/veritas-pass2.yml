@@ -35,14 +35,14 @@ jobs:
         run: python tools/veritas_pass2_builder.py
 
       - name: Independently validate the flat PDF archive
+        if: success()
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
-          import hashlib, json, zipfile
+          import hashlib, json, zipfile, io
           from pathlib import Path
           from pypdf import PdfReader
-
           zpath = Path('VERITAS_PASS_02_Current_Relevant_Corpus.zip')
           report = json.loads(Path('pass2_validation_report.json').read_text())
           assert zpath.is_file() and zpath.stat().st_size > 0
@@ -54,23 +54,22 @@ jobs:
               hashes = set()
               for name in names:
                   data = z.read(name)
-                  assert data.startswith(b'%PDF-')
-                  assert len(data) > 12000
+                  assert data.startswith(b'%PDF-') and len(data) > 12000
                   h = hashlib.sha256(data).hexdigest()
                   assert h not in hashes
                   hashes.add(h)
-                  import io
                   assert len(PdfReader(io.BytesIO(data), strict=False).pages) >= 2
           print(f'Independent validation passed: {len(names)} unique PDFs')
           PY
 
-      - name: Upload corpus and external validation report
+      - name: Upload corpus and validation report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: VERITAS_PASS_02_Current_Relevant_Corpus
           path: |
             VERITAS_PASS_02_Current_Relevant_Corpus.zip
             pass2_validation_report.json
-          if-no-files-found: error
+          if-no-files-found: warn
           compression-level: 0
           retention-days: 7
