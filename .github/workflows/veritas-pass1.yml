@@ -7,6 +7,7 @@ on:
       - "tools/veritas_pass1_download.py"
       - "tools/veritas_pass1_fast.py"
       - "tools/veritas_pass1_nearest.py"
+      - "tools/veritas_pass1_available.py"
       - ".github/workflows/veritas-pass1.yml"
 
 permissions:
@@ -38,7 +39,7 @@ jobs:
       - name: Download, recover, verify, deduplicate, and package PDFs
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python tools/veritas_pass1_nearest.py
+        run: python tools/veritas_pass1_available.py
 
       - name: Independently inspect packaged PDFs
         shell: bash
