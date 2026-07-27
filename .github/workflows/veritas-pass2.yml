@@ -1,0 +1,76 @@
+name: VERITAS Pass 2 Current Relevant Corpus
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tools/veritas_pass2_builder.py"
+      - ".github/workflows/veritas-pass2.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build-corpus:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out temporary corpus branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PDF acquisition and validation dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install requests beautifulsoup4 pypdf
+
+      - name: Acquire, validate, deduplicate, and package current sources
+        run: python tools/veritas_pass2_builder.py
+
+      - name: Independently validate the flat PDF archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, json, zipfile
+          from pathlib import Path
+          from pypdf import PdfReader
+
+          zpath = Path('VERITAS_PASS_02_Current_Relevant_Corpus.zip')
+          report = json.loads(Path('pass2_validation_report.json').read_text())
+          assert zpath.is_file() and zpath.stat().st_size > 0
+          with zipfile.ZipFile(zpath) as z:
+              names = z.namelist()
+              assert len(names) == report['accepted_count']
+              assert len(names) == len(set(names))
+              assert all(n.startswith('PASS_02_Current_Relevant/') and n.lower().endswith('.pdf') for n in names)
+              hashes = set()
+              for name in names:
+                  data = z.read(name)
+                  assert data.startswith(b'%PDF-')
+                  assert len(data) > 12000
+                  h = hashlib.sha256(data).hexdigest()
+                  assert h not in hashes
+                  hashes.add(h)
+                  import io
+                  assert len(PdfReader(io.BytesIO(data), strict=False).pages) >= 2
+          print(f'Independent validation passed: {len(names)} unique PDFs')
+          PY
+
+      - name: Upload corpus and external validation report
+        uses: actions/upload-artifact@v4
+        with:
+          name: VERITAS_PASS_02_Current_Relevant_Corpus
+          path: |
+            VERITAS_PASS_02_Current_Relevant_Corpus.zip
+            pass2_validation_report.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
