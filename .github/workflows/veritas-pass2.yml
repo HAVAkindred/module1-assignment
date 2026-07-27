@@ -7,6 +7,7 @@ on:
       - "tools/veritas_pass2_builder.py"
       - "tools/veritas_pass2_patch.py"
       - "tools/veritas_pass2_fastfinal.py"
+      - "tools/veritas_pass2_ultrafast.py"
       - ".github/workflows/veritas-pass2.yml"
 
 permissions:
@@ -16,7 +17,7 @@ permissions:
 jobs:
   build-corpus:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 35
     steps:
       - name: Check out temporary corpus branch
         uses: actions/checkout@v4
@@ -34,7 +35,7 @@ jobs:
           python -m pip install requests beautifulsoup4 pypdf cryptography
 
       - name: Acquire, validate, deduplicate, and package current sources
-        run: python tools/veritas_pass2_fastfinal.py
+        run: python tools/veritas_pass2_ultrafast.py
 
       - name: Independently validate the flat PDF archive
         if: success()
