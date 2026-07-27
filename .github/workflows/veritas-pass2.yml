@@ -6,8 +6,7 @@ on:
     paths:
       - "tools/veritas_pass2_builder.py"
       - "tools/veritas_pass2_patch.py"
-      - "tools/veritas_pass2_fastfinal.py"
-      - "tools/veritas_pass2_ultrafast.py"
+      - "tools/veritas_pass2_gold.py"
       - ".github/workflows/veritas-pass2.yml"
 
 permissions:
@@ -35,7 +34,7 @@ jobs:
           python -m pip install requests beautifulsoup4 pypdf cryptography
 
       - name: Acquire, validate, deduplicate, and package current sources
-        run: python tools/veritas_pass2_ultrafast.py
+        run: python tools/veritas_pass2_gold.py
 
       - name: Independently validate the flat PDF archive
         if: success()
