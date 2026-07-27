@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "tools/veritas_pass2_builder.py"
+      - "tools/veritas_pass2_patch.py"
       - ".github/workflows/veritas-pass2.yml"
 
 permissions:
@@ -29,10 +30,10 @@ jobs:
       - name: Install PDF acquisition and validation dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install requests beautifulsoup4 pypdf
+          python -m pip install requests beautifulsoup4 pypdf cryptography
 
       - name: Acquire, validate, deduplicate, and package current sources
-        run: python tools/veritas_pass2_builder.py
+        run: python tools/veritas_pass2_patch.py
 
       - name: Independently validate the flat PDF archive
         if: success()
@@ -58,7 +59,10 @@ jobs:
                   h = hashlib.sha256(data).hexdigest()
                   assert h not in hashes
                   hashes.add(h)
-                  assert len(PdfReader(io.BytesIO(data), strict=False).pages) >= 2
+                  reader = PdfReader(io.BytesIO(data), strict=False)
+                  if reader.is_encrypted:
+                      reader.decrypt('')
+                  assert len(reader.pages) >= 2
           print(f'Independent validation passed: {len(names)} unique PDFs')
           PY
 
