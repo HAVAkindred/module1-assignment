@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "tools/veritas_pass1_download.py"
+      - "tools/veritas_pass1_fast.py"
       - ".github/workflows/veritas-pass1.yml"
 
 permissions:
@@ -36,7 +37,7 @@ jobs:
       - name: Download, verify, deduplicate, and package PDFs
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python tools/veritas_pass1_download.py
+        run: python tools/veritas_pass1_fast.py
 
       - name: Independently validate packaged PDFs
         shell: bash
