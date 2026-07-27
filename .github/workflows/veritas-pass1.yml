@@ -1,0 +1,82 @@
+name: VERITAS Pass 1 Joint Doctrine Corpus
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tools/veritas_pass1_download.py"
+      - ".github/workflows/veritas-pass1.yml"
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  build-corpus:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out temporary corpus-builder branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install validation dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qpdf poppler-utils
+          python -m pip install --upgrade pip
+          python -m pip install requests beautifulsoup4 pypdf
+
+      - name: Download, verify, deduplicate, and package PDFs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python tools/veritas_pass1_download.py
+
+      - name: Independently validate packaged PDFs
+        shell: bash
+        run: |
+          set -euo pipefail
+          count=0
+          while IFS= read -r -d '' pdf; do
+            head -c 5 "$pdf" | grep -q '%PDF-'
+            qpdf --check "$pdf" >/dev/null
+            pdfinfo "$pdf" | grep -q '^Pages:'
+            count=$((count + 1))
+          done < <(find PASS_01_Joint_Doctrine -maxdepth 1 -type f -name '*.pdf' -print0)
+          test "$count" -ge 1
+          python - <<'PY'
+          import zipfile
+          from pathlib import Path
+          z = Path('VERITAS_PASS_01_Joint_Doctrine.zip')
+          assert z.is_file() and z.stat().st_size > 0
+          with zipfile.ZipFile(z) as f:
+              names = f.namelist()
+              assert names
+              assert all(n.startswith('PASS_01_Joint_Doctrine/') and n.lower().endswith('.pdf') for n in names)
+              assert len(names) == len(set(names))
+              assert all(f.read(n, 5).startswith(b'%PDF-') for n in names)
+          print(f'ZIP validation passed: {len(names)} PDFs')
+          PY
+
+      - name: Upload single ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VERITAS_PASS_01_Joint_Doctrine
+          path: VERITAS_PASS_01_Joint_Doctrine.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+      - name: Remove temporary branch after artifact creation
+        if: always() && github.event_name == 'pull_request'
+        continue-on-error: true
+        shell: bash
+        run: |
+          git push origin --delete "${GITHUB_HEAD_REF}" || true
